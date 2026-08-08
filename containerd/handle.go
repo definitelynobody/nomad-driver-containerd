@@ -220,8 +220,45 @@ func (h *taskHandle) shutdown(ctxContainerd context.Context, timeout time.Durati
 	return h.task.Kill(ctxWithTimeout, syscall.SIGKILL)
 }
 
+// cleanupTimeout bounds how long DestroyTask waits for the container to be
+// removed before giving up on it.
+const cleanupTimeout = 60 * time.Second
+
 func (h *taskHandle) cleanup(ctxContainerd context.Context) error {
-	ctxWithTimeout, cancel := context.WithTimeout(ctxContainerd, 30*time.Second)
+	// containerd's task.Delete waits for the shim to close the task's stdio,
+	// and that wait takes no context (cio.Wait). A shim that holds the pipes
+	// open blocks the call for good, which strands DestroyTask and leaves
+	// Nomad reporting an exited task as still running. Bound the wait, and
+	// on expiry close the stdio ourselves to release it.
+	done := make(chan error, 1)
+	go func() {
+		done <- h.deleteTaskAndContainer(ctxContainerd)
+	}()
+
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(cleanupTimeout):
+	}
+
+	h.logger.Warn("timed out removing container, closing its stdio to unblock",
+		"container", h.containerName, "timeout", cleanupTimeout)
+	if io := h.task.IO(); io != nil {
+		io.Close()
+	}
+
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(cleanupTimeout):
+		return fmt.Errorf("timed out removing container %s", h.containerName)
+	}
+}
+
+func (h *taskHandle) deleteTaskAndContainer(ctxContainerd context.Context) error {
+	// Deliberately not derived from cleanup's deadline: this runs on its own
+	// goroutine and must stay valid after cleanup has returned.
+	ctxWithTimeout, cancel := context.WithTimeout(ctxContainerd, 5*time.Minute)
 	defer cancel()
 
 	if _, err := h.task.Delete(ctxWithTimeout); err != nil {
