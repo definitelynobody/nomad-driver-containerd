@@ -629,14 +629,12 @@ func (d *Driver) handleWait(ctx context.Context, handle *taskHandle, ch chan *dr
 		}
 	}
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-d.ctx.Done():
-			return
-		case ch <- result:
-		}
+	// Send once and return, so the deferred close(ch) runs. Looping here
+	// left a goroutine per task blocked on a resend that nothing reads.
+	select {
+	case <-ctx.Done():
+	case <-d.ctx.Done():
+	case ch <- result:
 	}
 }
 

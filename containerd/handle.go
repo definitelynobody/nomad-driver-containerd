@@ -58,12 +58,12 @@ type taskHandle struct {
 }
 
 func (h *taskHandle) TaskStatus(ctxContainerd context.Context) *drivers.TaskStatus {
-	h.stateLock.RLock()
-	defer h.stateLock.RUnlock()
+	h.stateLock.Lock()
+	defer h.stateLock.Unlock()
 
 	h.procState = drivers.TaskStateExited
 
-	isRunning, err := h.IsRunning(ctxContainerd)
+	isRunning, err := h.isRunning(ctxContainerd)
 	if err != nil {
 		h.procState = drivers.TaskStateUnknown
 	} else if isRunning {
@@ -87,6 +87,13 @@ func (h *taskHandle) IsRunning(ctxContainerd context.Context) (bool, error) {
 	h.stateLock.RLock()
 	defer h.stateLock.RUnlock()
 
+	return h.isRunning(ctxContainerd)
+}
+
+// isRunning reports whether the container is still running. The caller must
+// already hold stateLock: sync.RWMutex is not reentrant, so taking it here
+// as well would deadlock against any writer that queued in between.
+func (h *taskHandle) isRunning(ctxContainerd context.Context) (bool, error) {
 	ctxWithTimeout, cancel := context.WithTimeout(ctxContainerd, 30*time.Second)
 	defer cancel()
 
