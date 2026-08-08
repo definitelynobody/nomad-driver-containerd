@@ -252,6 +252,8 @@ func NewPlugin(logger log.Logger) drivers.DriverPlugin {
 	ctx, cancel := context.WithCancel(context.Background())
 	logger = logger.Named(PluginName)
 
+	servePprof(logger)
+
 	// This will create a new containerd client which will talk to
 	// default containerd socket path.
 	client, err := containerd.New("/run/containerd/containerd.sock")

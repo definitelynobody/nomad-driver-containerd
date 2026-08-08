@@ -58,22 +58,24 @@ type taskHandle struct {
 }
 
 func (h *taskHandle) TaskStatus(ctxContainerd context.Context) *drivers.TaskStatus {
-	h.stateLock.Lock()
-	defer h.stateLock.Unlock()
+	h.stateLock.RLock()
+	defer h.stateLock.RUnlock()
 
-	h.procState = drivers.TaskStateExited
+	// Held into a local rather than assigned to h.procState, which would be
+	// a write under a read lock. Nothing outside this method reads it.
+	procState := drivers.TaskStateExited
 
 	isRunning, err := h.isRunning(ctxContainerd)
 	if err != nil {
-		h.procState = drivers.TaskStateUnknown
+		procState = drivers.TaskStateUnknown
 	} else if isRunning {
-		h.procState = drivers.TaskStateRunning
+		procState = drivers.TaskStateRunning
 	}
 
 	return &drivers.TaskStatus{
 		ID:          h.taskConfig.ID,
 		Name:        h.taskConfig.Name,
-		State:       h.procState,
+		State:       procState,
 		StartedAt:   h.startedAt,
 		CompletedAt: h.completedAt,
 		ExitResult:  h.exitResult,
