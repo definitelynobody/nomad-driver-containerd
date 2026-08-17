@@ -108,11 +108,25 @@ func (d *Driver) pullImage(imageName, imagePullTimeout string, auth *RegistryAut
 	}
 
 	pullOpts := []containerd.RemoteOpt{
-		containerd.WithPullUnpack,
 		withResolver(d.parshAuth(auth)),
 	}
 
-	return d.client.Pull(ctxWithTimeout, named.String(), pullOpts...)
+	image, err := d.client.Pull(ctxWithTimeout, named.String(), pullOpts...)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unpack separately instead of via containerd.WithPullUnpack, which
+	// unpacks during the fetch, before the image record is written. A remote
+	// snapshotter resolves a layer against that record, so under
+	// WithPullUnpack it has nothing to match and the prepare fails. An empty
+	// snapshotter name keeps containerd's own resolution, which honours the
+	// containerd.io/defaults/snapshotter namespace label.
+	if err := image.Unpack(ctxWithTimeout, ""); err != nil {
+		return nil, fmt.Errorf("Failed to unpack image %s: %v", named.String(), err)
+	}
+
+	return image, nil
 }
 
 func (d *Driver) createContainer(containerConfig *ContainerConfig, config *TaskConfig) (containerd.Container, error) {
