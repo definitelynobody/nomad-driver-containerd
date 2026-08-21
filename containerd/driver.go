@@ -81,6 +81,7 @@ var (
 		),
 		"containerd_runtime": hclspec.NewAttr("containerd_runtime", "string", true),
 		"stats_interval":     hclspec.NewAttr("stats_interval", "string", false),
+		"snapshotter":        hclspec.NewAttr("snapshotter", "string", false),
 		"allow_privileged": hclspec.NewDefault(
 			hclspec.NewAttr("allow_privileged", "bool", false),
 			hclspec.NewLiteral("true"),
@@ -154,6 +155,7 @@ type Config struct {
 	Enabled           bool         `codec:"enabled"`
 	ContainerdRuntime string       `codec:"containerd_runtime"`
 	StatsInterval     string       `codec:"stats_interval"`
+	Snapshotter       string       `codec:"snapshotter"`
 	AllowPrivileged   bool         `codec:"allow_privileged"`
 	Auth              RegistryAuth `codec:"auth"`
 }
