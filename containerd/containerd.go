@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/oci"
+	snpkg "github.com/containerd/containerd/pkg/snapshotters"
 	refdocker "github.com/containerd/containerd/reference/docker"
 	remotesdocker "github.com/containerd/containerd/remotes/docker"
 	"github.com/docker/go-units"
@@ -111,7 +112,10 @@ func (d *Driver) pullImage(imageName, imagePullTimeout string, auth *RegistryAut
 		withResolver(d.parshAuth(auth)),
 	}
 	if d.config.Snapshotter != "" {
-		pullOpts = append(pullOpts, containerd.WithPullSnapshotter(d.config.Snapshotter))
+		pullOpts = append(pullOpts,
+			containerd.WithPullSnapshotter(d.config.Snapshotter),
+			containerd.WithImageHandlerWrapper(snpkg.AppendInfoHandlerWrapper(named.String())),
+		)
 	}
 
 	image, err := d.client.Pull(ctxWithTimeout, named.String(), pullOpts...)
