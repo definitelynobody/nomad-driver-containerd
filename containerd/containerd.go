@@ -109,6 +109,7 @@ func (d *Driver) pullImage(imageName, imagePullTimeout string, auth *RegistryAut
 	}
 
 	pullOpts := []containerd.RemoteOpt{
+		containerd.WithPullUnpack,
 		withResolver(d.parshAuth(auth)),
 	}
 	if d.config.Snapshotter != "" {
@@ -118,16 +119,7 @@ func (d *Driver) pullImage(imageName, imagePullTimeout string, auth *RegistryAut
 		)
 	}
 
-	image, err := d.client.Pull(ctxWithTimeout, named.String(), pullOpts...)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := image.Unpack(ctxWithTimeout, d.config.Snapshotter); err != nil {
-		return nil, fmt.Errorf("Failed to unpack image %s: %v", named.String(), err)
-	}
-
-	return image, nil
+	return d.client.Pull(ctxWithTimeout, named.String(), pullOpts...)
 }
 
 func (d *Driver) createContainer(containerConfig *ContainerConfig, config *TaskConfig) (containerd.Container, error) {
